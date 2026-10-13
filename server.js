@@ -12,15 +12,12 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 const DERIV_API_TOKEN = process.env.DERIV_API_TOKEN || '';
-const DERIV_APP_ID = process.env.DERIV_APP_ID || '1089'; // Default Deriv test app ID
+const DERIV_APP_ID = process.env.DERIV_APP_ID || '1089';
 
-// In-memory state for connected web clients
-let activeWs = null;
 let currentSymbol = 'R_10';
-let marketSubscribed = false;
 
 function connectToDeriv(clientSocket) {
-  // Use public or authorized endpoint based on token availability
+  // Correct official Deriv public WebSocket connection string
   const wsUrl = `wss://ws.derivws.com/websockets/v3?app_id=${DERIV_APP_ID}`;
   console.log(`Connecting to Deriv WebSocket: ${wsUrl}`);
   
@@ -29,13 +26,23 @@ function connectToDeriv(clientSocket) {
   derivWs.on('open', () => {
     console.log('Connected to Deriv WebSocket API');
     
-    // Authorize if token is provided
+    // Authorize if token is provided, otherwise fetch public stream
     if (DERIV_API_TOKEN) {
       derivWs.send(JSON.stringify({ authorize: DERIV_API_TOKEN }));
     } else {
-      // If no token, request history & ticks publicly
       requestMarketData(derivWs, currentSymbol);
     }
+
+    // Keep connection alive with periodic pings every 30 seconds
+    const pingInterval = setInterval(() => {
+      if (derivWs.readyState === WebSocket.OPEN) {
+        derivWs.send(JSON.stringify({ ping: 1 }));
+      } else {
+        clearInterval(pingInterval);
+      }
+    }, 30000);
+
+    derivWs.on('close', () => clearInterval(pingInterval));
   });
 
   derivWs.on('message', (data) => {
@@ -51,7 +58,7 @@ function connectToDeriv(clientSocket) {
         }
       }
 
-      // Forward tick and history data to frontend UI
+      // Forward responses to browser frontend
       if (clientSocket.readyState === WebSocket.OPEN) {
         clientSocket.send(JSON.stringify(response));
       }
@@ -77,7 +84,7 @@ function requestMarketData(derivWs, symbol) {
 
   console.log(`Fetching history and subscribing to ticks for: ${symbol}`);
   
-  // 1. Get 1000 tick history for initial probability analysis
+  // 1. Get 1000 tick history for initial calculation
   derivWs.send(JSON.stringify({
     ticks_history: symbol,
     adjust_start_time: 1,
@@ -87,7 +94,7 @@ function requestMarketData(derivWs, symbol) {
     style: 'ticks'
   }));
 
-  // 2. Subscribe to real-time tick stream
+  // 2. Subscribe to real-time ticks
   derivWs.send(JSON.stringify({
     ticks: symbol,
     subscribe: 1
@@ -98,15 +105,15 @@ function requestMarketData(derivWs, symbol) {
 const wss = new WebSocket.Server({ server });
 wss.on('connection', (ws) => {
   console.log('Frontend dashboard connected');
-  activeWs = connectToDeriv(ws);
+  const activeDerivWs = connectToDeriv(ws);
 
   ws.on('message', (message) => {
     try {
       const msg = JSON.parse(message);
       if (msg.action === 'change_symbol' && msg.symbol) {
         currentSymbol = msg.symbol;
-        if (activeWs && activeWs.readyState === WebSocket.OPEN) {
-          requestMarketData(activeWs, currentSymbol);
+        if (activeDerivWs && activeDerivWs.readyState === WebSocket.OPEN) {
+          requestMarketData(activeDerivWs, currentSymbol);
         }
       }
     } catch (e) {
@@ -116,11 +123,10 @@ wss.on('connection', (ws) => {
 
   ws.on('close', () => {
     console.log('Frontend dashboard disconnected');
-    if (activeWs) activeWs.close();
+    if (activeDerivWs) activeDerivWs.close();
   });
 });
 
 server.listen(PORT, () => {
   console.log(`Signal Analyzer Bot running on http://localhost:${PORT}`);
 });
-  
