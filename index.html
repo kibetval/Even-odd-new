@@ -1,239 +1,625 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Deriv Even/Odd Live Signal Analyzer Bot</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deriv Even/Odd Signal Analyzer Bot</title>
   <style>
-    :root { --bg-color:#0b0e14; --card-bg:#121824; --border-color:#1e293b; --accent-blue:#3b82f6; --accent-red:#ef4444; --accent-green:#10b981; --text-main:#f8fafc; --text-muted:#94a3b8; }
-    *{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI',Tahoma,Helvetica,Arial,sans-serif}
-    body{background:var(--bg-color);color:var(--text-main);min-height:100vh;padding:20px}
-    .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-    .status-badge{padding:6px 14px;border-radius:20px;background:#334155;color:#cbd5e1}
-    .status-badge.connected{background:rgba(16,185,129,0.12);color:var(--accent-green);border:1px solid rgba(16,185,129,0.18)}
-    .status-badge.disconnected{background:rgba(239,68,68,0.08);color:var(--accent-red);border:1px solid rgba(239,68,68,0.12)}
-    .market-selector{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;background:var(--card-bg);padding:12px;border-radius:10px;border:1px solid var(--border-color)}
-    .market-btn{background:#1e293b;border:1px solid #334155;color:var(--text-muted);padding:6px 10px;border-radius:8px;cursor:pointer;font-weight:600}
-    .market-btn.active{background:var(--accent-blue);color:#fff}
-    .controls{display:flex;gap:10px;margin-bottom:16px}
-    .btn{flex:1;padding:10px;border-radius:8px;border:none;font-weight:700;cursor:pointer}
-    .btn-start{background:var(--accent-green);color:#fff}
-    .btn-stop{background:var(--accent-red);color:#fff}
-    .grid-container{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    .card{background:var(--card-bg);border:1px solid var(--border-color);padding:14px;border-radius:10px}
-    .digits-stream{display:flex;gap:6px;overflow-x:auto;padding-top:8px}
-    .digit-pill{min-width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#1e293b;border:1px solid #334155;font-weight:700}
-    .digit-pill.even{color:#60a5fa;border-color:rgba(59,130,246,0.4)}
-    .digit-pill.odd{color:#f87171;border-color:rgba(239,68,68,0.4)}
-    .terminal{background:#05070a;border-radius:8px;padding:10px;height:160px;overflow:auto;border:1px solid var(--border-color);color:#38bdf8;font-family:monospace;font-size:12px}
-    .small{font-size:12px;color:var(--text-muted)}
+    :root {
+      --bg: #070b14;
+      --panel: #101827;
+      --panel-2: #0f172a;
+      --border: #1e293b;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --blue: #60a5fa;
+      --red: #f87171;
+      --green: #34d399;
+      --amber: #fbbf24;
+      --shadow: rgba(15, 23, 42, 0.7);
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    body {
+      padding: 18px;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 18px 20px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 14px 30px var(--shadow);
+    }
+
+    .title-wrap h1 {
+      margin: 0;
+      font-size: clamp(1.3rem, 2vw, 2rem);
+      color: var(--blue);
+    }
+
+    .subtitle {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.8rem;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 150px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(251, 191, 36, 0.08);
+      color: var(--amber);
+      font-weight: 700;
+      font-size: 0.8rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .status.connected {
+      background: rgba(52, 211, 153, 0.12);
+      color: var(--green);
+      border-color: rgba(52, 211, 153, 0.35);
+    }
+
+    .status.error {
+      background: rgba(248, 113, 113, 0.12);
+      color: var(--red);
+      border-color: rgba(248, 113, 113, 0.35);
+    }
+
+    .market-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+
+    .market-btn {
+      border: 1px solid #334155;
+      background: #1e293b;
+      color: var(--muted);
+      border-radius: 9px;
+      padding: 8px 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .market-btn:hover,
+    .market-btn.active {
+      background: var(--blue);
+      color: white;
+      border-color: var(--blue);
+      transform: translateY(-1px);
+    }
+
+    .grid {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 18px 30px rgba(15, 23, 42, 0.36);
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 0.73rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .price-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .price {
+      font-size: clamp(1.7rem, 3vw, 2.6rem);
+      font-weight: 800;
+      font-family: "Courier New", monospace;
+      letter-spacing: 0.03em;
+    }
+
+    .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      background: rgba(96, 165, 250, 0.12);
+      color: var(--blue);
+      border: 1px solid rgba(96, 165, 250, 0.35);
+    }
+
+    .signal-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 140px;
+    }
+
+    .signal-value {
+      font-size: clamp(2rem, 5vw, 3.3rem);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin: 12px 0 8px;
+    }
+
+    .signal-value.even {
+      color: var(--blue);
+    }
+
+    .signal-value.odd {
+      color: var(--red);
+    }
+
+    .signal-value.wait {
+      color: var(--amber);
+    }
+
+    .signal-note {
+      display: inline-block;
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .prob-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 14px;
+      gap: 12px;
+      font-size: 0.95rem;
+    }
+
+    .bar-wrap {
+      position: relative;
+      height: 20px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.12);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .bar-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      border-radius: inherit;
+      transition: width 0.35s ease;
+    }
+
+    .bar-even {
+      background: linear-gradient(90deg, rgba(96,165,250,0.9), rgba(59,130,246,0.9));
+      width: 50%;
+    }
+
+    .bar-odd {
+      background: linear-gradient(90deg, rgba(248,113,113,0.9), rgba(239,68,68,0.9));
+      width: 50%;
+    }
+
+    .controls {
+      margin-top: 18px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      flex: 1;
+      min-width: 140px;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 18px;
+      color: white;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      opacity: 0.95;
+    }
+
+    .btn-start {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+    }
+
+    .btn-stop {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+
+    .terminal {
+      margin-top: 18px;
+      background: #030712;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      min-height: 180px;
+      max-height: 220px;
+      overflow-y: auto;
+      padding: 12px;
+      font-family: "Courier New", monospace;
+      color: #cbd5e1;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+
+    .terminal-line {
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+    }
+
+    .digits-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .digit-pill {
+      min-width: 38px;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9px;
+      font-weight: 800;
+      font-size: 0.95rem;
+      border: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text);
+    }
+
+    .digit-pill.even {
+      border-color: rgba(96, 165, 250, 0.5);
+      color: var(--blue);
+      background: rgba(96, 165, 250, 0.08);
+    }
+
+    .digit-pill.odd {
+      border-color: rgba(248, 113, 113, 0.5);
+      color: var(--red);
+      background: rgba(248, 113, 113, 0.08);
+    }
+
+    @media (max-width: 850px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>⚡ Deriv Even/Odd Signal Analyzer Bot</h1>
-    <div id="connectionStatus" class="status-badge disconnected">Connecting to Deriv...</div>
-  </div>
-
-  <div class="market-selector">
-    <span class="small" style="align-self:center;margin-right:6px">Volatility:</span>
-    <button class="market-btn active" data-symbol="R_10">R_10</button>
-    <button class="market-btn" data-symbol="R_25">R_25</button>
-    <button class="market-btn" data-symbol="R_50">R_50</button>
-    <button class="market-btn" data-symbol="R_75">R_75</button>
-    <button class="market-btn" data-symbol="R_100">R_100</button>
-    <button class="market-btn" data-symbol="1HZ10V">1HZ10</button>
-    <button class="market-btn" data-symbol="1HZ25V">1HZ25</button>
-    <button class="market-btn" data-symbol="1HZ50V">1HZ50</button>
-    <button class="market-btn" data-symbol="1HZ75V">1HZ75</button>
-    <button class="market-btn" data-symbol="1HZ100V">1HZ100</button>
-  </div>
-
-  <div class="controls">
-    <button id="startBtn" class="btn btn-start">▶ Start Signal Analyzer</button>
-    <button id="stopBtn" class="btn btn-stop" disabled>⏹ Stop Analyzer</button>
-  </div>
-
-  <div class="grid-container">
-    <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div class="small">Probability Analysis (Last 100 Ticks)</div>
-        <div id="totalAnalyzed" class="small">0 Ticks</div>
+  <div class="container">
+    <header class="header">
+      <div class="title-wrap">
+        <h1>Deriv Even/Odd Signal Analyzer</h1>
+        <div class="subtitle">Live tick feed • probability engine • automatic signal detection</div>
       </div>
-      <div style="display:flex;gap:12px;align-items:center;justify-content:space-around;margin-bottom:8px">
-        <div style="text-align:center"><div class="small">EVEN</div><div id="evenProb" style="font-weight:800">50.0%</div></div>
-        <div style="text-align:center"><div class="small">ODD</div><div id="oddProb" style="font-weight:800">50.0%</div></div>
-      </div>
-      <div class="small" style="margin-bottom:6px">Recent Last Digits Stream:</div>
-      <div id="digitsStream" class="digits-stream"></div>
+      <div id="connectionStatus" class="status">Connecting...</div>
+    </header>
+
+    <div class="market-bar" id="marketSelector">
+      <button class="market-btn active" data-symbol="R_75">R_75</button>
+      <button class="market-btn" data-symbol="R_10">R_10</button>
+      <button class="market-btn" data-symbol="R_25">R_25</button>
+      <button class="market-btn" data-symbol="R_50">R_50</button>
+      <button class="market-btn" data-symbol="R_100">R_100</button>
+      <button class="market-btn" data-symbol="1HZ10V">1HZ10</button>
+      <button class="market-btn" data-symbol="1HZ25V">1HZ25</button>
+      <button class="market-btn" data-symbol="1HZ50V">1HZ50</button>
+      <button class="market-btn" data-symbol="1HZ75V">1HZ75</button>
+      <button class="market-btn" data-symbol="1HZ100V">1HZ100</button>
     </div>
 
-    <div class="card">
-      <div style="font-weight:800;margin-bottom:8px">Live Trading Signal</div>
-      <div id="signalStatus" style="font-size:16px;font-weight:800;margin-bottom:8px" class="small">STANDBY</div>
-      <div id="signalDetails" class="small">Click 'Start Signal Analyzer' to begin monitoring live market deviations.</div>
+    <div class="grid">
+      <div class="card">
+        <div class="label">Current Price</div>
+        <div class="price-row">
+          <div id="currentPrice" class="price">0.0000</div>
+          <div id="lastDigitPill" class="pill">Digit: -</div>
+        </div>
+      </div>
+
+      <div class="card signal-box">
+        <div class="label">Signal</div>
+        <div id="signalValue" class="signal-value wait">WAIT</div>
+        <div id="signalNote" class="signal-note">Waiting for live tick data.</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 18px;">
+      <div class="label">Even / Odd Probability</div>
+      <div class="prob-row">
+        <span>Even</span>
+        <strong id="evenPercent">0.0%</strong>
+      </div>
+      <div class="bar-wrap">
+        <div id="evenBar" class="bar-fill bar-even" style="width: 50%;"></div>
+      </div>
+
+      <div class="prob-row" style="margin-top: 14px;">
+        <span>Odd</span>
+        <strong id="oddPercent">0.0%</strong>
+      </div>
+      <div class="bar-wrap">
+        <div id="oddBar" class="bar-fill bar-odd" style="width: 50%;"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="startBtn" class="btn btn-start">Start Feed</button>
+      <button id="stopBtn" class="btn btn-stop">Stop Feed</button>
+    </div>
+
+    <div class="card" style="margin-top: 18px;">
+      <div class="label">Recent Digits</div>
+      <div id="digitList" class="digits-list"></div>
+    </div>
+
+    <div class="terminal" id="terminal">
+      <div class="terminal-line">[system] waiting for live market feed...</div>
     </div>
   </div>
 
-  <div style="margin-top:12px" class="card">
-    <div style="font-weight:800;margin-bottom:8px">Live Market Terminal Feed</div>
-    <div id="terminal" class="terminal"><div>[System] Initializing connection...</div></div>
-  </div>
+  <script>
+    const statusEl = document.getElementById('connectionStatus');
+    const currentPriceEl = document.getElementById('currentPrice');
+    const lastDigitPillEl = document.getElementById('lastDigitPill');
+    const signalValueEl = document.getElementById('signalValue');
+    const signalNoteEl = document.getElementById('signalNote');
+    const evenPercentEl = document.getElementById('evenPercent');
+    const oddPercentEl = document.getElementById('oddPercent');
+    const evenBarEl = document.getElementById('evenBar');
+    const oddBarEl = document.getElementById('oddBar');
+    const digitListEl = document.getElementById('digitList');
+    const terminalEl = document.getElementById('terminal');
+    const marketButtons = [...document.querySelectorAll('.market-btn')];
 
-<script>
-const DERIV_ENDPOINTS = [
-  'wss://ws.binaryws.com/websockets/v3?app_id=1089',
-  'wss://ws.derivws.com/websockets/v3?app_id=1089'
-];
-let ws = null;
-let currentSymbol = 'R_10';
-let tickHistory = [];
-let isRunning = false;
-let activeSubscriptionId = null;
-let endpointIndex = 0;
-let reconnectTimer = null;
+    let ws = null;
+    let recentDigits = [];
+    let currentSymbol = 'R_75';
+    let isRunning = true;
 
-const connectionStatusEl = document.getElementById('connectionStatus');
-const terminal = document.getElementById('terminal');
-const startBtn = document.getElementById('startBtn');
-const stopBtn = document.getElementById('stopBtn');
-const evenProbEl = document.getElementById('evenProb');
-const oddProbEl = document.getElementById('oddProb');
-const totalAnalyzedEl = document.getElementById('totalAnalyzed');
-const digitsStreamEl = document.getElementById('digitsStream');
-const signalStatusEl = document.getElementById('signalStatus');
-const signalDetailsEl = document.getElementById('signalDetails');
-
-function log(msg) {
-  const d = document.createElement('div');
-  d.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-  terminal.appendChild(d);
-  terminal.scrollTop = terminal.scrollHeight;
-}
-
-function tryConnect() {
-  if (ws) try { ws.close(); } catch(e){}
-  const url = DERIV_ENDPOINTS[endpointIndex % DERIV_ENDPOINTS.length];
-  log(`Connecting to ${url}`);
-  connectionStatusEl.textContent = 'Connecting...';
-  connectionStatusEl.className = 'status-badge disconnected';
-  ws = new WebSocket(url);
-
-  ws.onopen = () => {
-    log('WebSocket open');
-    connectionStatusEl.textContent = 'Connected';
-    connectionStatusEl.className = 'status-badge connected';
-    requestMarketData(currentSymbol);
-  };
-
-  ws.onmessage = (ev) => {
-    let data = null;
-    try { data = JSON.parse(ev.data); } catch (e) { return; }
-
-    if (data.msg_type === 'history' && data.history && Array.isArray(data.history.prices)) {
-      const prices = data.history.prices.map(p=> Number(p)).filter(n=>!Number.isNaN(n));
-      tickHistory = prices.map(p=> getLastDigitFromNumber(p));
-      log(`Loaded ${tickHistory.length} historical ticks for ${currentSymbol}`);
-      updateAnalysis();
-      return;
+    function setStatus(text, type = 'neutral') {
+      statusEl.textContent = text;
+      statusEl.className = 'status';
+      if (type === 'connected') statusEl.classList.add('connected');
+      if (type === 'error') statusEl.classList.add('error');
     }
 
-    if (data.msg_type === 'tick' && data.tick) {
-      if (data.subscription && data.subscription.id) activeSubscriptionId = data.subscription.id;
-      const q = Number(data.tick.quote);
-      if (!Number.isNaN(q)) {
-        const digit = getLastDigitFromNumber(q);
-        tickHistory.push(digit);
-        if (tickHistory.length > 100) tickHistory.shift();
-        log(`Tick [${data.tick.symbol}]: ${q} (digit ${digit})`);
-        if (isRunning) { updateAnalysis(); evaluateSignal(); }
+    function addTerminalLine(text) {
+      const line = document.createElement('div');
+      line.className = 'terminal-line';
+      line.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+      terminalEl.prepend(line);
+      while (terminalEl.children.length > 18) terminalEl.removeChild(terminalEl.lastChild);
+    }
+
+    function connectSocket() {
+      const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+      const wsUrl = `${protocol}://${location.host}`;
+
+      try {
+        ws = new WebSocket(wsUrl);
+      } catch (error) {
+        setStatus('Socket Error', 'error');
+        addTerminalLine('Failed to open websocket connection.');
+        return;
       }
-      return;
+
+      ws.onopen = () => {
+        setStatus('Connected', 'connected');
+        addTerminalLine('Connected to Deriv bridge.');
+        ws.send(JSON.stringify({ action: 'change_symbol', symbol: currentSymbol }));
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          handleMessage(data);
+        } catch (error) {
+          console.error('Message parse error:', error);
+        }
+      };
+
+      ws.onclose = () => {
+        if (isRunning) {
+          setStatus('Reconnecting...', 'neutral');
+          addTerminalLine('Connection lost. Reconnecting...');
+          setTimeout(connectSocket, 3000);
+        } else {
+          setStatus('Stopped', 'error');
+        }
+      };
+
+      ws.onerror = () => {
+        setStatus('Connection Error', 'error');
+        addTerminalLine('WebSocket error encountered.');
+      };
     }
 
-    if (data.error) {
-      log(`API error: ${data.error.message || JSON.stringify(data.error)}`);
+    function handleMessage(data) {
+      if (!data) return;
+
+      if (data.type === 'status') {
+        setStatus(data.message || 'Connected', data.connected ? 'connected' : 'error');
+        return;
+      }
+
+      if (data.msg_type === 'history' && Array.isArray(data.history?.prices)) {
+        const prices = data.history.prices
+          .map((p) => Number(p))
+          .filter((p) => Number.isFinite(p));
+
+        if (prices.length) {
+          const digits = prices.map((p) => Number(String(p).slice(-1))).filter((d) => !Number.isNaN(d));
+          pushDigits(digits);
+          addTerminalLine(`History loaded: ${prices.length} ticks for ${currentSymbol}`);
+        }
+        return;
+      }
+
+      if (data.type === 'tick' || data.msg_type === 'tick') {
+        const tickValue = Number(data.tick?.tick ?? data.tick ?? data.price ?? 0);
+        const tickDigit = Number(String(Math.abs(tickValue)).slice(-1));
+
+        if (Number.isFinite(tickValue)) {
+          currentPriceEl.textContent = tickValue.toFixed(4);
+          lastDigitPillEl.textContent = `Digit: ${tickDigit}`;
+          pushDigits([tickDigit]);
+          addTerminalLine(`Live tick: ${tickValue} | digit ${tickDigit}`);
+          updateProbability();
+        }
+        return;
+      }
+
+      if (data.type === 'deriv_error' || data.error) {
+        addTerminalLine(`Deriv error: ${data.error?.message || JSON.stringify(data.error || data)}`);
+        return;
+      }
+
+      if (data.msg_type === 'authorize') {
+        addTerminalLine(`Authorization result: ${data.error ? data.error.message : 'successful'}`);
+      }
     }
-  };
 
-  ws.onerror = () => {
-    log('WebSocket error — switching endpoint');
-    endpointIndex++;
-    scheduleReconnect(2000);
-  };
+    function pushDigits(array) {
+      if (!Array.isArray(array) || !array.length) return;
+      const digits = array.filter((d) => Number.isFinite(Number(d)) && d >= 0 && d <= 9).map((d) => Number(d));
+      if (!digits.length) return;
+      recentDigits.push(...digits);
+      recentDigits = recentDigits.slice(-80);
+      renderDigits();
+      updateProbability();
+    }
 
-  ws.onclose = () => {
-    log('WebSocket closed');
-    connectionStatusEl.textContent = 'Disconnected';
-    connectionStatusEl.className = 'status-badge disconnected';
-    scheduleReconnect(3000);
-  };
-}
+    function renderDigits() {
+      digitListEl.innerHTML = '';
+      recentDigits.slice(-20).forEach((digit) => {
+        const pill = document.createElement('div');
+        pill.className = `digit-pill ${digit % 2 === 0 ? 'even' : 'odd'}`;
+        pill.textContent = digit;
+        digitListEl.appendChild(pill);
+      });
+    }
 
-function scheduleReconnect(ms) {
-  if (reconnectTimer) clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(() => { tryConnect(); }, ms);
-}
+    function updateProbability() {
+      const total = recentDigits.length;
+      if (!total) {
+        evenPercentEl.textContent = '0.0%';
+        oddPercentEl.textContent = '0.0%';
+        evenBarEl.style.width = '50%';
+        oddBarEl.style.width = '50%';
+        signalValueEl.textContent = 'WAIT';
+        signalValueEl.className = 'signal-value wait';
+        signalNoteEl.textContent = 'Waiting for live tick data.';
+        return;
+      }
 
-function requestMarketData(symbol) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) { log('Socket not open yet'); return; }
-  if (activeSubscriptionId) {
-    ws.send(JSON.stringify({ forget: activeSubscriptionId }));
-    activeSubscriptionId = null;
-  }
-  ws.send(JSON.stringify({ ticks_history: symbol, adjust_start_time: 1, count: 200, end: 'latest', style: 'ticks' }));
-  ws.send(JSON.stringify({ ticks: symbol, subscribe: 1 }));
-  log(`Requested history+subscribe for ${symbol}`);
-}
+      const evenCount = recentDigits.filter((digit) => digit % 2 === 0).length;
+      const oddCount = total - evenCount;
+      const evenPct = (evenCount / total) * 100;
+      const oddPct = (oddCount / total) * 100;
 
-function getLastDigitFromNumber(n) {
-  const s = n.toFixed(5).replace(/[^0-9]/g, '');
-  return parseInt(s.slice(-1), 10);
-}
+      evenPercentEl.textContent = `${evenPct.toFixed(1)}%`;
+      oddPercentEl.textContent = `${oddPct.toFixed(1)}%`;
+      evenBarEl.style.width = `${evenPct}%`;
+      oddBarEl.style.width = `${oddPct}%`;
 
-function updateAnalysis() {
-  if (!tickHistory || tickHistory.length === 0) return;
-  const total = tickHistory.length;
-  const evenCount = tickHistory.filter(d=>d%2===0).length;
-  evenProbEl.textContent = `${((evenCount/total)*100).toFixed(1)}%`;
-  oddProbEl.textContent = `${(((total-evenCount)/total)*100).toFixed(1)}%`;
-  totalAnalyzedEl.textContent = `${total} Ticks`;
-  digitsStreamEl.innerHTML = '';
-  tickHistory.slice(-15).reverse().forEach(d => {
-    const pill = document.createElement('div'); pill.className = `digit-pill ${d%2===0?'even':'odd'}`; pill.textContent = d; digitsStreamEl.appendChild(pill);
-  });
-}
+      if (evenPct >= 55 && evenPct > oddPct) {
+        signalValueEl.textContent = 'EVEN';
+        signalValueEl.className = 'signal-value even';
+        signalNoteEl.textContent = 'High even probability detected in live stream.';
+      } else if (oddPct >= 55 && oddPct > evenPct) {
+        signalValueEl.textContent = 'ODD';
+        signalValueEl.className = 'signal-value odd';
+        signalNoteEl.textContent = 'High odd probability detected in live stream.';
+      } else {
+        signalValueEl.textContent = 'WAIT';
+        signalValueEl.className = 'signal-value wait';
+        signalNoteEl.textContent = `Momentum is balanced. Even ${evenPct.toFixed(1)}% vs Odd ${oddPct.toFixed(1)}%.`;
+      }
+    }
 
-function evaluateSignal() {
-  if (tickHistory.length < 10) return;
-  const recent = tickHistory.slice(-10);
-  const evenCount = recent.filter(d=>d%2===0).length;
-  if (evenCount >= 7) {
-    signalStatusEl.textContent = 'ENTER ODD (DIFFERS)'; signalDetailsEl.innerHTML = `High concentration of EVEN digits (${evenCount}/10).<br><b>Recommendation: Enter ODD position. Exit after 1 tick.</b>`;
-  } else if (evenCount <= 3) {
-    signalStatusEl.textContent = 'ENTER EVEN (MATCHES)'; signalDetailsEl.innerHTML = `High concentration of ODD digits (${10-evenCount}/10).<br><b>Recommendation: Enter EVEN position. Exit after 1 tick.</b>`;
-  } else {
-    signalStatusEl.textContent = 'MONITORING MARKET'; signalDetailsEl.textContent = `Balanced (${evenCount} Even / ${10-evenCount} Odd). Waiting for deviation...`;
-  }
-}
+    document.getElementById('startBtn').addEventListener('click', () => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        addTerminalLine('Feed already running.');
+        return;
+      }
+      isRunning = true;
+      connectSocket();
+    });
 
-document.querySelectorAll('.market-btn').forEach(b=>b.addEventListener('click', e=>{
-  document.querySelectorAll('.market-btn').forEach(x=>x.classList.remove('active'));
-  e.currentTarget.classList.add('active');
-  currentSymbol = e.currentTarget.getAttribute('data-symbol');
-  tickHistory = [];
-  updateAnalysis();
-  requestMarketData(currentSymbol);
-}));
+    document.getElementById('stopBtn').addEventListener('click', () => {
+      isRunning = false;
+      if (ws) {
+        ws.close();
+      }
+      setStatus('Stopped', 'error');
+      addTerminalLine('Feed stopped by user.');
+    });
 
-startBtn.addEventListener('click', ()=>{
-  if (!ws || ws.readyState !== WebSocket.OPEN) { alert('Not connected to Deriv yet — please wait'); return; }
-  isRunning = true; startBtn.disabled = true; stopBtn.disabled = false; log('Analyzer started'); signalStatusEl.textContent='ANALYZING...';
-  if (tickHistory.length>0) evaluateSignal();
-});
-stopBtn.addEventListener('click', ()=>{ isRunning=false; startBtn.disabled=false; stopBtn.disabled=true; log('Analyzer stopped'); signalStatusEl.textContent='STANDBY'; });
+    marketButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        marketButtons.forEach((btn) => btn.classList.remove('active'));
+        button.classList.add('active');
+        currentSymbol = button.dataset.symbol;
+        addTerminalLine(`Switching market to ${currentSymbol}`);
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ action: 'change_symbol', symbol: currentSymbol }));
+        }
+      });
+    });
 
-tryConnect();
-</script>
+    connectSocket();
+  </script>
 </body>
 </html>
